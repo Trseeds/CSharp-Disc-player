@@ -1,8 +1,10 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 class CD
 {
+    string PreGap = "00:02:00";
     [DllImport("winmm.dll", CharSet = CharSet.Auto)]
     private static extern int mciSendString(string command, StringBuilder buffer, int bufferSize, IntPtr hwndCallback);
     StringBuilder Buffer = new StringBuilder(128);
@@ -12,13 +14,52 @@ class CD
     }
     public void Play(string From, string To)
     {
+        try
+        {
+            From = RetrieveTrackPositions()[System.Convert.ToInt16(From)-1];
+        }
+        catch
+        {
+            try
+            {
+                From = $"{System.Convert.ToInt16(From.Split(':')[0])}:{System.Convert.ToInt16(From.Split(':')[1])}:{System.Convert.ToInt16(From.Split(':')[2])}";
+            }
+            catch
+            {
+                From = "00:02:00";
+                Console.WriteLine("Argument one was invalid, playing from beginning of disc.");
+            }
+        }
+        try
+        {
+            To = RetrieveTrackPositions()[System.Convert.ToInt16(To) - 1];
+        }
+        catch
+        {
+            try
+            {
+                To = $"{System.Convert.ToInt16(To.Split(':')[0])}:{System.Convert.ToInt16(To.Split(':')[1])}:{System.Convert.ToInt16(To.Split(':')[2])}";
+            }
+            catch
+            {
+                if (To == "end")
+                {
+                    To = RetrieveRunTime();
+                }
+                else
+                {
+                    To = RetrieveRunTime();
+                    Console.WriteLine("Argument two was invalid, playing until end of disc.");
+                }
+            }
+        }
         mciSendString($"play cdaudio from {From} to {To}", null, 0, IntPtr.Zero);
     }
     public void Pause()
     {
         mciSendString("pause cdaudio", null, 0, IntPtr.Zero);
     }
-    public void Resume()
+    public void Resume(string Position)
     {
         mciSendString("resume cdaudio", null, 0, IntPtr.Zero);
     }
@@ -28,6 +69,7 @@ class CD
     }
     public void End()
     {
+        Stop();
         mciSendString("close cdaudio", null, 0, IntPtr.Zero);
     }
     public string[] RetrieveTrackLengths()
@@ -43,9 +85,10 @@ class CD
         }
         return (TrackDuration.ToArray());
     }
-    public string[] RetrieveTrackPositions(string[] TrackDuration)
+    public string[] RetrieveTrackPositions()
     {
         List<string> TrackPositions = new List<string>();
+        string[] TrackDuration = RetrieveTrackLengths();
         int Minute = 00;
         int Second = 00;
         int Frame = 00;
@@ -55,10 +98,6 @@ class CD
             Minute += System.Convert.ToInt16(i.Split(":")[0]);
             Second += System.Convert.ToInt16(i.Split(":")[1]);
             Frame += System.Convert.ToInt16(i.Split(":")[2]);
-            if (Minute > 80)
-            {
-                Console.WriteLine("CD is overburned!");
-            }
             if (Second > 59)
             {
                 Second -= 60;
@@ -92,50 +131,56 @@ class CD
             TrackPositions.Add(Position);
             Indx += 1;
         }
+        TrackPositions.RemoveAt(TrackDuration.Length);
         return (TrackPositions.ToArray());
     }
     public string RetrieveRunTime()
     {
-        string[] TrackDurations = RetrieveTrackLengths();
-        string LastTrackDuration = TrackDurations[TrackDurations.Length-1];
-        string RunTime = RetrieveTrackPositions(TrackDurations)[RetrieveTrackPositions(TrackDurations).Length-1];
-        return (RunTime);
-    }
-}
-class Program
-{
-    static string GetUsrInp(string[] Checkfor, string PrintText)
-    {
-        while (true)
+        string LastTrackPosition = RetrieveTrackPositions()[RetrieveTrackPositions().Length-1];
+        string LastTrackDuration = RetrieveTrackLengths()[RetrieveTrackLengths().Length-1];
+        int MinutePos = System.Convert.ToInt16(LastTrackPosition.Split(":")[0]);
+        int SecondPos = System.Convert.ToInt16(LastTrackPosition.Split(":")[1]);
+        int FramePos = System.Convert.ToInt16(LastTrackPosition.Split(":")[2]);
+        int MinuteDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[0]);
+        int SecondDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[0]);
+        int FrameDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[0]);
+        int MinuteFin = MinutePos + MinuteDur;
+        int SecondFin = SecondPos + SecondDur;
+        if (MinuteFin > 80)
         {
-            Console.WriteLine(PrintText);
-            string UsrInp = Console.ReadLine();
-            try
-            {
-                foreach (string i in Checkfor)
-                {
-                    if (UsrInp == i)
-                    {
-                        return (UsrInp);
-                    }
-                }
-                Console.WriteLine("Invalid action.\n");
-            }
-            catch
-            {
-                Console.WriteLine("Invalid action.\n");
-            }
+            Console.WriteLine("CD is overburned!");
         }
+        if (SecondFin > 59)
+        {
+            SecondFin -= 60;
+            MinuteFin += 1;
+        }
+        int FrameFin = FramePos + FrameDur;
+        if (FrameFin > 74)
+        {
+            FrameFin -= 75;
+            SecondFin += 1;
+        }
+        return ($"{MinuteFin}:{SecondFin}:{FrameFin}");
     }
-    static void Main()
+    public void ListDiscProp()
     {
-        CD CD = new CD();
-        CD.Init();
+        string[] CDTracks = RetrieveTrackLengths();
+        string[] CDTrackPositions = RetrieveTrackPositions();
+        string CDRunTime = RetrieveRunTime();
+        for (int i = 0; i < CDTracks.Length; i++)
+        {
+            Console.WriteLine($"Track {i + 1}: {CDTracks[i]} ({CDTrackPositions[i]})");
+        }
+        Console.WriteLine($"Runtime: {CDRunTime}");
+    }
+    public void CheckForDisc()
+    {
         while (true)
         {
             try
             {
-                CD.RetrieveRunTime();
+                RetrieveRunTime();
                 break;
             }
             catch
@@ -144,45 +189,145 @@ class Program
             }
             Console.ReadLine();
         }
-        string[] CDTracks = CD.RetrieveTrackLengths();
-        string[] CDTrackPositions = CD.RetrieveTrackPositions(CDTracks);
-        string CDRunTime = CD.RetrieveRunTime();
-        List<string> CheckForTrack = new List<string>();
-        for (int i = 0; i < CDTracks.Length; i++)
+    }
+    public string[] GetFuncFromInp(string i, string[] Commands)
+    {
+        if (i == "play" | i == "ply")
         {
-            Console.WriteLine($"Track {i+1}: {CDTracks[i]}");
-            CheckForTrack.Add((i+1).ToString());
+            string[] Return = { "play", "yes" };
+            return (Return);
         }
-        Console.WriteLine($"Runtime: {CDRunTime}");
-        string[] CheckFor = {"play","stop","quit"};
-        string Print = "Play, Stop, Quit?";
-        while(true)
+        else if (i == "discinfo" | i == "dscinf")
         {
-            string UsrInp = GetUsrInp(CheckFor, Print);
-            if (UsrInp == CheckFor[0])
+            string[] Return = { "dscinf", "no" };
+            return (Return);
+        }
+        else if (i == "quit" | i == "qt")
+        {
+            string[] Return = { "quit", "no" };
+            return (Return);
+        }
+        else if (i == "stop" | i == "stp")
+        {
+            string[] Return = { "stop", "no" };
+            return (Return);
+        }
+        else if (i == "help" | i == "hlp")
+        {
+            string[] Return = { "help", "no" };
+            return (Return);
+        }
+        else
+        {
+            string[] Return = { "none", "no" };
+            return (Return);
+        }
+    }
+    public void Help()
+    {
+        string Help =
+            "Separate all arguments with '-'. Invalid Commands and arguments will be ignored.\n" +
+            "Time format is MM:SS:FF\n\n" +
+            "play/ply: Plays the disc. You can specify tracks or times to start and end at.\n\n" +
+            "Note about playing: Almost all discs have two seconds of silence before the first track begins. (00:02:00)\n" +
+            "But some discs have longer gaps, older discs may have an additional 32 frames of silence. (00:02:32)\n" +
+            "This player assumes 00:02:00, but if track 1 starts after that, the player will not play it.\n" +
+            "If you think you have a disc with additional silence, use the command *defaultpregap/defprgp with the timestamp needed.\n\n" +
+            "stop/stp: Stops playback, can not resume after stopping.\n\n" +
+            "*pause/ps: Pauses playback, saves the current timestamp to be resumed from later.\n" +
+            "*resume/rsm: Resumes playback from the timestamp saved by the pause command.\n\n" +
+            "*fastforward/ff: Fast forwards a specified amount of seconds.\n" +
+            "*rewind/rw: Rewinds a specified amount of seconds.\n\n" +
+            "*next/nxt: Skips to the next track.\n" +
+            "*previous/prv: Seeks to the start of the previous track.\n\n" +
+            "*seekdisc/skdsc: Seeks to a specified time on the disk\n" +
+            "*seek/sk: Seeks to a specified time within the currently playing track.\n" +
+            "*seektrack/sktrk: Seeks to a specified track.\n\n" +
+            "*eject/ejct: Ejects the disc if your drive supports it.\n" +
+            "discinfo/dscinf: Displays info about the disc.\n" +
+            "*playerinfo/plyinf: Displays current info about the player.\n" +
+            "help/hlp: Prints this message.\n" +
+            "quit/qt: Exits CSharp Disc Player.\n" +
+            "*Feature not yet implemented.";
+        Console.WriteLine(Help);
+    }
+}
+class Program
+{
+    static void Main()
+    {
+        string[] Commands = {"play","ply","discinfo","dscinf","quit","qt","stop","stp","help","hlp"};
+        CD CD = new CD();
+        CD.Init();
+        CD.CheckForDisc();
+        CD.Help();
+        while (true)
+        {
+            bool PrintedMessage = false;
+            CD.CheckForDisc();
+            string UsrInp = Console.ReadLine();
+            foreach (string i in Commands)
             {
-                string UsrInpFrom = GetUsrInp(CheckForTrack.ToArray(), "Start playing at which track?");
-                CheckForTrack.Add("end");
-                string UsrInpTo = GetUsrInp(CheckForTrack.ToArray(), "Stop playing at which track? (Enter end to play until the player reaches the end of disc)");
-                if (UsrInpTo == "end")
+                string FuncType = "none";
+                if (UsrInp.Split('-')[0].Trim() == i)
                 {
-                    CD.Play(CDTrackPositions[System.Convert.ToInt16(UsrInpFrom) - 1], CDRunTime);
+                    FuncType = CD.GetFuncFromInp(UsrInp.Split("-")[0].Trim(), Commands)[0];
+                    string HasArgs = CD.GetFuncFromInp(UsrInp.Split("-")[0].Trim(), Commands)[1];
+                    string Arg1;
+                    string Arg2;
+                    if (HasArgs == "yes")
+                    {
+                        try
+                        {
+                            Arg1 = UsrInp.Split('-')[1].Trim();
+                        }
+                        catch
+                        {
+                            if (FuncType == "play")
+                            {
+                                Arg1 = "00:02:00";
+                            }
+                            else
+                            {
+                                Arg1 = "0";
+                            }
+                        }
+                        try
+                        {
+                            Arg2 = UsrInp.Split('-')[2].Trim();
+                        }
+                        catch
+                        {
+                            Arg2 = "end";
+                        }
+                    }
+                    else
+                    {
+                        Arg1 = "please stop whining compiler";
+                        Arg2 = "pretty please!";
+                    }
+                    if (FuncType == "play")
+                    {
+                        CD.Play(Arg1, Arg2);
+                    }
+                    if (FuncType == "dscinf")
+                    {
+                        CD.ListDiscProp();
+                    }
+                    if (FuncType == "stop")
+                    {
+                        CD.Stop();
+                    }
+                    if (FuncType == "help")
+                    {
+                        CD.Help();
+                    }
+                    if (FuncType == "quit")
+                    {
+                        CD.End();
+                        Environment.Exit(1);
+                    }
                 }
-                else
-                {
-                    CD.Play(CDTrackPositions[System.Convert.ToInt16(UsrInpFrom) - 1], CDTrackPositions[System.Convert.ToInt16(UsrInpTo) - 1]);
-                }
-                CheckForTrack.Remove("end");
-            }
-            else if (UsrInp == CheckFor[1])
-            {
-                CD.Stop();
-            }
-            else if (UsrInp == CheckFor[2])
-            {
-                CD.Stop();
-                CD.End();
-                break;
             }
         }
     }
