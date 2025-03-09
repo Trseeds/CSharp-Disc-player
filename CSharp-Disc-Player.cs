@@ -5,6 +5,8 @@ using System.Text;
 class CD
 {
     string PreGap = "00:02:00";
+    string PauseTime = "00:00:00";
+    //string Pause
     [DllImport("winmm.dll", CharSet = CharSet.Auto)]
     private static extern int mciSendString(string command, StringBuilder buffer, int bufferSize, IntPtr hwndCallback);
     StringBuilder Buffer = new StringBuilder(128);
@@ -26,7 +28,7 @@ class CD
             }
             catch
             {
-                From = "00:02:00";
+                From = RetrieveTrackPositions()[0];
                 Console.WriteLine("Argument one was invalid, playing from beginning of disc.");
             }
         }
@@ -89,41 +91,41 @@ class CD
     {
         List<string> TrackPositions = new List<string>();
         string[] TrackDuration = RetrieveTrackLengths();
-        int Minute = 00;
-        int Second = 00;
-        int Frame = 00;
+        int Minute = System.Convert.ToInt16($"{PreGap[0]}{PreGap[1]}");
+        int Second = System.Convert.ToInt16($"{PreGap[3]}{PreGap[4]}");
+        int Frame = System.Convert.ToInt16($"{PreGap[6]}{PreGap[7]}");
         int Indx = 0;
         foreach (string i in TrackDuration)
         {
-            Minute += System.Convert.ToInt16(i.Split(":")[0]);
-            Second += System.Convert.ToInt16(i.Split(":")[1]);
-            Frame += System.Convert.ToInt16(i.Split(":")[2]);
-            if (Second > 59)
-            {
-                Second -= 60;
-                Minute += 1;
-            }
+            Minute += System.Convert.ToInt16($"{i[0]}{i[1]}");
+            Second += System.Convert.ToInt16($"{i[3]}{i[4]}");
+            Frame += System.Convert.ToInt16($"{i[6]}{i[7]}");
             if (Frame > 74)
             {
                 Frame -= 75;
                 Second += 1;
             }
+            if (Second > 59)
+            {
+                Second -= 60;
+                Minute += 1;
+            }
             if (Indx == 0)
             {
-                TrackPositions.Add("00:02:00");
+                TrackPositions.Add(PreGap);
             }
             string MinuteS = Minute.ToString();
             string SecondS = Second.ToString();
-            string FrameS = Second.ToString();
-            if (Minute.ToString().Length == 1)
+            string FrameS = Frame.ToString();
+            if (Minute.ToString().Length < 2)
             {
                 MinuteS = $"0{Minute.ToString()}";
             }
-            if (Second.ToString().Length == 1)
+            if (Second.ToString().Length < 2)
             {
                 SecondS = $"0{Second.ToString()}";
             }
-            if (Frame.ToString().Length == 1)
+            if (Frame.ToString().Length < 2)
             {
                 FrameS = $"0{Frame.ToString()}";
             }
@@ -131,8 +133,25 @@ class CD
             TrackPositions.Add(Position);
             Indx += 1;
         }
+        //foreach (string i in TrackPositions)
+        //{
+        //    Console.WriteLine(i);
+        //}
         TrackPositions.RemoveAt(TrackDuration.Length);
         return (TrackPositions.ToArray());
+    }
+    public void SetDefaultPregap(string UsrInp)
+    {
+        try
+        {
+            string TryThis = $"{System.Convert.ToInt16(UsrInp.Split(':')[0])}:{System.Convert.ToInt16(UsrInp.Split(':')[1])}:{System.Convert.ToInt16(UsrInp.Split(':')[2])}";
+            PreGap = UsrInp;
+        }
+        catch
+        {
+            Console.WriteLine("Argument one was invalid, pregap is 00:02:00");
+            PreGap = "00:02:00";
+        }
     }
     public string RetrieveRunTime()
     {
@@ -142,24 +161,24 @@ class CD
         int SecondPos = System.Convert.ToInt16(LastTrackPosition.Split(":")[1]);
         int FramePos = System.Convert.ToInt16(LastTrackPosition.Split(":")[2]);
         int MinuteDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[0]);
-        int SecondDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[0]);
-        int FrameDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[0]);
+        int SecondDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[1]);
+        int FrameDur = System.Convert.ToInt16(LastTrackDuration.Split(":")[2]);
         int MinuteFin = MinutePos + MinuteDur;
         int SecondFin = SecondPos + SecondDur;
+        int FrameFin = FramePos + FrameDur;
         if (MinuteFin > 80)
         {
             Console.WriteLine("CD is overburned!");
+        }
+        if (FrameFin > 74)
+        {
+            FrameFin -= 75;
+            SecondFin += 1;
         }
         if (SecondFin > 59)
         {
             SecondFin -= 60;
             MinuteFin += 1;
-        }
-        int FrameFin = FramePos + FrameDur;
-        if (FrameFin > 74)
-        {
-            FrameFin -= 75;
-            SecondFin += 1;
         }
         return ($"{MinuteFin}:{SecondFin}:{FrameFin}");
     }
@@ -217,6 +236,11 @@ class CD
             string[] Return = { "help", "no" };
             return (Return);
         }
+        else if (i == "setpregap" | i == "stprgp")
+        {
+            string[] Return = { "pregap", "yes" };
+            return (Return);
+        }
         else
         {
             string[] Return = { "none", "no" };
@@ -226,16 +250,16 @@ class CD
     public void Help()
     {
         string Help =
-            "Separate all arguments with '-'. Invalid Commands and arguments will be ignored.\n" +
+            "Separate all arguments with '-'. Invalid commands and arguments will be ignored.\n" +
             "Time format is MM:SS:FF\n\n" +
-            "play/ply: Plays the disc. You can specify tracks or times to start and end at.\n\n" +
+            "play/ply: Plays the disc. You can specify tracks or times to start and end at.\n" +
+            "stop/stp: Stops playback, can not resume after stopping.\n" +
+            "*pause/ps: Pauses playback, saves the current timestamp to be resumed from later.\n" +
+            "*resume/rsm: Resumes playback from the timestamp saved by the pause command.\n\n" +
             "Note about playing: Almost all discs have two seconds of silence before the first track begins. (00:02:00)\n" +
             "But some discs have longer gaps, older discs may have an additional 32 frames of silence. (00:02:32)\n" +
             "This player assumes 00:02:00, but if track 1 starts after that, the player will not play it.\n" +
-            "If you think you have a disc with additional silence, use the command *defaultpregap/defprgp with the timestamp needed.\n\n" +
-            "stop/stp: Stops playback, can not resume after stopping.\n\n" +
-            "*pause/ps: Pauses playback, saves the current timestamp to be resumed from later.\n" +
-            "*resume/rsm: Resumes playback from the timestamp saved by the pause command.\n\n" +
+            "If you think you have a disc with additional silence, use the command setpregap/stprgp with the timestamp needed.\n\n" +
             "*fastforward/ff: Fast forwards a specified amount of seconds.\n" +
             "*rewind/rw: Rewinds a specified amount of seconds.\n\n" +
             "*next/nxt: Skips to the next track.\n" +
@@ -256,14 +280,13 @@ class Program
 {
     static void Main()
     {
-        string[] Commands = {"play","ply","discinfo","dscinf","quit","qt","stop","stp","help","hlp"};
+        string[] Commands = {"play","ply","discinfo","dscinf","quit","qt","stop","stp","help","hlp","setpregap","stprgp"};
         CD CD = new CD();
         CD.Init();
         CD.CheckForDisc();
         CD.Help();
         while (true)
         {
-            bool PrintedMessage = false;
             CD.CheckForDisc();
             string UsrInp = Console.ReadLine();
             foreach (string i in Commands)
@@ -285,7 +308,7 @@ class Program
                         {
                             if (FuncType == "play")
                             {
-                                Arg1 = "00:02:00";
+                                Arg1 = CD.RetrieveTrackPositions()[0];
                             }
                             else
                             {
@@ -321,6 +344,10 @@ class Program
                     if (FuncType == "help")
                     {
                         CD.Help();
+                    }
+                    if (FuncType == "pregap")
+                    {
+                        CD.SetDefaultPregap(Arg1);
                     }
                     if (FuncType == "quit")
                     {
