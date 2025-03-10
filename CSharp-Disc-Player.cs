@@ -74,6 +74,18 @@ class CD
         Stop();
         mciSendString("close cdaudio", null, 0, IntPtr.Zero);
     }
+    public void Seek(string UsrInp)
+    {
+        try
+        {
+            string From = $"{System.Convert.ToInt16(UsrInp.Split(':')[0])}:{System.Convert.ToInt16(UsrInp.Split(':')[1])}:{System.Convert.ToInt16(UsrInp.Split(':')[2])}";
+            Play(From, PauseTo);
+        }
+        catch
+        {
+            ;
+        }
+    }
     public string[] RetrieveTrackLengths()
     {
         mciSendString("status cdaudio number of tracks", Buffer, Buffer.Capacity, IntPtr.Zero);
@@ -191,6 +203,11 @@ class CD
             string[] Return = { "resume", "no" };
             return (Return);
         }
+        else if (i == "seekdisc" | i == "skdsc")
+        {
+            string[] Return = { "seekdisc", "yes" };
+            return (Return);
+        }
         else
         {
             string[] Return = { "none", "no" };
@@ -210,7 +227,7 @@ class CD
             "*rewind/rw: Rewinds a specified amount of seconds.\n\n" +
             "*next/nxt: Skips to the next track.\n" +
             "*previous/prv: Seeks to the start of the previous track.\n\n" +
-            "*seekdisc/skdsc: Seeks to a specified time on the disk\n" +
+            "seekdisc/skdsc: Seeks to a specified time on the disk\n" +
             "*seek/sk: Seeks to a specified time within the currently playing track.\n" +
             "*seektrack/sktrk: Seeks to a specified track.\n\n" +
             "*eject/ejct: Ejects the disc if your drive supports it.\n" +
@@ -226,7 +243,7 @@ class Program
 {
     static void Main()
     {
-        string[] Commands = {"play","ply","discinfo","dscinf","quit","qt","stop","stp","help","hlp","pause","ps","resume","rsm"};
+        string[] Commands = {"play","ply","discinfo","dscinf","quit","qt","stop","stp","help","hlp","pause","ps","resume","rsm","seekdisc","skdsc"};
         CD CD = new CD();
         CD.Init();
         CD.CheckForDisc();
@@ -298,6 +315,10 @@ class Program
                     if (FuncType == "resume")
                     {
                         CD.Resume();
+                    }
+                    if (FuncType == "seekdisc")
+                    {
+                        CD.Seek(Arg1);
                     }
                     if (FuncType == "quit")
                     {
