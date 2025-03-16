@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using TagLib.Matroska;
 class CD
 {
     string PauseFrom = "00:00:00";
@@ -17,6 +18,7 @@ class CD
     {
         while (true)
         {
+            //Tray("close");
             try
             {
                 GetRunTime();
@@ -27,6 +29,17 @@ class CD
                 Console.WriteLine("No disc was detected, press return to check again.");
             }
             Console.ReadLine();
+        }
+    }
+    public void Tray(string Type)
+    {
+        if (Type == "open")
+        {
+            mciSendString("set cdaudio door open", null, 0, IntPtr.Zero);
+        }
+        if (Type == "close")
+        {
+            mciSendString("set cdaudio door closed", null, 0, IntPtr.Zero);
         }
     }
     public void End()
@@ -44,7 +57,7 @@ class CD
         {
             try
             {
-                From = $"{System.Convert.ToInt16(From.Split(':')[0])}:{System.Convert.ToInt16(From.Split(':')[1])}:{System.Convert.ToInt16(From.Split(':')[2])}";
+                From = $"{System.Convert.ToInt16(From.Split(':')[0]):00}:{System.Convert.ToInt16(From.Split(':')[1]):00}:{System.Convert.ToInt16(From.Split(':')[2]):00}";
             }
             catch
             {
@@ -59,7 +72,7 @@ class CD
         {
             try
             {
-                To = $"{System.Convert.ToInt16(To.Split(':')[0])}:{System.Convert.ToInt16(To.Split(':')[1])}:{System.Convert.ToInt16(To.Split(':')[2])}";
+                To = $"{System.Convert.ToInt16(To.Split(':')[0]):00}:{System.Convert.ToInt16(To.Split(':')[1]):00}:{System.Convert.ToInt16(To.Split(':')[2]):00}";
             }
             catch
             {
@@ -101,7 +114,7 @@ class CD
         {
             try
             {
-                string From = $"{System.Convert.ToInt16(UsrInp.Split(':')[0])}:{System.Convert.ToInt16(UsrInp.Split(':')[1])}:{System.Convert.ToInt16(UsrInp.Split(':')[2])}";
+                string From = $"{System.Convert.ToInt16(UsrInp.Split(':')[0]):00}:{System.Convert.ToInt16(UsrInp.Split(':')[1]):00}:{System.Convert.ToInt16(UsrInp.Split(':')[2]):00}";
                 Play(From, PauseTo);
             }
             catch
@@ -109,6 +122,40 @@ class CD
                 ;
             }
         }
+    }
+    public void SeekTrack(string UsrInp)
+    {
+        try
+        {
+            string From = $"{System.Convert.ToInt16(UsrInp.Split(':')[0]):00}:{System.Convert.ToInt16(UsrInp.Split(':')[1]):00}:{System.Convert.ToInt16(UsrInp.Split(':')[2]):00}";
+        }
+        catch
+        {
+            ;
+        }
+        int Track = System.Convert.ToInt16(GetPlayHeadPosition()[1]);
+        int MinuteTrack = System.Convert.ToInt16(GetTrackPositions()[Track - 1].Split(":")[0]);
+        int SecondTrack = System.Convert.ToInt16(GetTrackPositions()[Track - 1].Split(":")[1]) + MinuteTrack * 60;
+        int FrameTrack = System.Convert.ToInt16(GetTrackPositions()[Track - 1].Split(":")[2]) + SecondTrack * 75;
+        int MinuteFrom = System.Convert.ToInt16(UsrInp.Split(":")[0]);
+        int SecondFrom = System.Convert.ToInt16(UsrInp.Split(":")[1]) + MinuteFrom * 60;
+        int FrameFrom = System.Convert.ToInt16(UsrInp.Split(":")[2]) + SecondFrom * 75;
+        int MinuteFin = 0;
+        int SecondFin = 0;
+        int FrameFin = 0;
+        FrameFin = FrameFrom + FrameTrack;
+        while (FrameFin > 74)
+        {
+            FrameFin -= 75;
+            SecondFin++;
+        }
+        while (SecondFin > 59)
+        {
+            SecondFin -= 60;
+            MinuteFin++;
+        }
+        Console.WriteLine($"{MinuteFin:00}:{SecondFin:00}:{FrameFin:00}");
+        Seek($"{MinuteFin:00}:{SecondFin:00}:{FrameFin:00}");
     }
     public void DragPlayHead(string UsrInp)
     {
@@ -127,7 +174,7 @@ class CD
             SecondTo += 60;
             MinuteFrom -= 1;
         }
-        Seek($"{MinuteFrom}:{SecondTo}:{FrameFrom}");
+        Seek($"{MinuteFrom:00}:{SecondTo:00}:{FrameFrom:00}");
     }
     public string[] GetTrackLengths()
     {
@@ -152,52 +199,6 @@ class CD
             TrackPositions.Add(Buffer.ToString());
         }
         return (TrackPositions.ToArray());
-    }
-    public string[] GetPlayHeadPosition()
-    {
-        List<string> Return = new List<string>();
-        mciSendString("status cdaudio position", Buffer, Buffer.Capacity, IntPtr.Zero);
-        Return.Add(Buffer.ToString());
-        int Minute = System.Convert.ToInt16(Return[0].Split(":")[0]);
-        int Second = System.Convert.ToInt16(Return[0].Split(":")[1]) + Minute * 60;
-        int Frame = System.Convert.ToInt16(Return[0].Split(":")[2]) + Second * 75;
-        int Track = 0;
-        foreach (string i in GetTrackPositions())
-        {
-            int MinuteComp = System.Convert.ToInt16(i.Split(":")[0]);
-            int SecondComp = System.Convert.ToInt16(i.Split(":")[1]) + MinuteComp * 60;
-            int FrameComp = System.Convert.ToInt16(i.Split(":")[2]) + SecondComp * 75;
-            if (Frame >= FrameComp)
-            {
-                Track += 1;
-            }
-            else
-            {
-                Return.Add(Track.ToString());
-                break;
-            }
-        }
-        int MinuteTrack = System.Convert.ToInt16(GetTrackLengths()[System.Convert.ToInt16(Return[1])-1].Split(":")[0]);
-        int SecondTrack = System.Convert.ToInt16(GetTrackLengths()[System.Convert.ToInt16(Return[1])-1].Split(":")[1]) + MinuteTrack * 60;
-        int FrameTrack = System.Convert.ToInt16(GetTrackLengths()[System.Convert.ToInt16(Return[1])-1].Split(":")[2]) + SecondTrack * 75;
-        Frame -= FrameTrack;
-        int FrameFin = 0;
-        int SecondFin = 0;
-        int MinuteFin = 0;
-        while (Frame > 74)
-        {
-            Frame -= 75;
-            SecondFin += 1;
-        }
-        while (SecondFin > 59)
-        {
-            SecondFin -= 60;
-            MinuteFin += 1;
-        }
-        FrameFin = Frame;
-        Return.Add($"{FrameFin}:{SecondFin}:{FrameFin}");
-        Console.WriteLine(Return.ToArray().Length);
-        return (Return.ToArray());
     }
     public string GetRunTime()
     {
@@ -226,7 +227,37 @@ class CD
             SecondFin -= 60;
             MinuteFin += 1;
         }
-        return ($"{MinuteFin}:{SecondFin}:{FrameFin}");
+        return ($"{MinuteFin:00}:{SecondFin:00}:{FrameFin:00}");
+    }
+    public string[] GetPlayHeadPosition()
+    {
+        List<string> Return = new List<string>();
+        mciSendString("status cdaudio position", Buffer, Buffer.Capacity, IntPtr.Zero);
+        Return.Add(Buffer.ToString());
+        int Minute = System.Convert.ToInt16(Return[0].Split(":")[0]);
+        int Second = System.Convert.ToInt16(Return[0].Split(":")[1]) + Minute * 60;
+        int Frame = System.Convert.ToInt16(Return[0].Split(":")[2]) + Second * 75;
+        mciSendString("status cdaudio current track", Buffer, Buffer.Capacity, IntPtr.Zero);
+        int Track = System.Convert.ToInt16(Buffer.ToString());
+        Return.Add(Track.ToString());
+        int MinuteTrack = System.Convert.ToInt16(GetTrackPositions()[Track-1].Split(":")[0]);
+        int SecondTrack = System.Convert.ToInt16(GetTrackPositions()[Track - 1].Split(":")[1]) + MinuteTrack * 60;
+        int FrameTrack = System.Convert.ToInt16(GetTrackPositions()[Track - 1].Split(":")[2]) + SecondTrack * 75;
+        int MinuteFin = 0;
+        int SecondFin = 0;
+        int FrameFin = Frame - FrameTrack;
+        while (FrameFin > 74)
+        {
+            FrameFin -= 75;
+            SecondFin++;
+        }
+        while (SecondFin > 59)
+        {
+            SecondFin -= 60;
+            MinuteFin++;
+        }
+        Return.Add($"{MinuteFin:00}:{SecondFin:00}:{FrameFin:00}");
+        return (Return.ToArray());
     }
     public void ListDiscProp()
     {
@@ -239,7 +270,7 @@ class CD
         }
         Console.WriteLine($"Runtime: {CDRunTime}");
     }
-    public void ListPlayheadProp()
+    public void ListPlayHeadProp()
     {
         Console.WriteLine($"Track: {GetPlayHeadPosition()[1]}\nTime on track: {GetPlayHeadPosition()[2]}\nTime on disc: {GetPlayHeadPosition()[0]}");
     }
@@ -285,6 +316,11 @@ class CD
             string[] Return = { "seekdisc", "yes" };
             return (Return);
         }
+        else if (i == "seek" | i == "sk")
+        {
+            string[] Return = { "seek", "yes" };
+            return (Return);
+        }
         else if (i == "next" | i == "nxt")
         {
             string[] Return = { "next", "no" };
@@ -305,9 +341,14 @@ class CD
             string[] Return = { "rw", "yes" };
             return (Return);
         }
-        else if (i == "playerinfo" | i == "plyrinf")
+        else if (i == "info" | i == "inf")
         {
             string[] Return = { "plyhdprp", "no" };
+            return (Return);
+        }
+        else if (i == "eject" | i == "ejct")
+        {
+            string[] Return = { "open", "no" };
             return (Return);
         }
         else
@@ -330,10 +371,10 @@ class CD
             "next/nxt: Skips to the next track.\n" +
             "previous/prv: Seeks to the start of the previous track.\n\n" +
             "seekdisc/skdsc: Seeks to a specified time or track on the disc\n" +
-            "*seek/sk: Seeks to a specified time within the currently playing track.\n\n" +
-            "*eject/ejct: Ejects the disc if your drive supports it.\n" +
+            "seek/sk: Seeks to a specified time within the currently playing track.\n\n" +
+            "eject/ejct: Ejects the disc if your drive supports it.\n" +
             "discinfo/dscinf: Displays info about the disc.\n" +
-            "playerinfo/plyinf: Displays current info about the playhead.\n" +
+            "info/inf: Displays information about the position on disc.\n" +
             "help/hlp: Prints this message.\n" +
             "quit/qt: Exits CSharp Disc Player.\n";
         Console.WriteLine(Help);
@@ -343,7 +384,7 @@ class Program
 {
     static void Main()
     {
-        string[] Commands = {"play", "ply", "discinfo", "dscinf", "quit", "qt", "stop", "stp", "help", "hlp", "pause", "ps", "resume", "rsm", "seekdisc", "skdsc", "next","nxt","previous","prv","fastforward","ff","rewind","rw","playerinfo","plyrinf"};
+        string[] Commands = { "play", "ply", "discinfo", "dscinf", "quit", "qt", "stop", "stp", "help", "hlp", "pause", "ps", "resume", "rsm", "seekdisc", "skdsc", "next", "nxt", "previous", "prv", "fastforward", "ff", "rewind", "rw", "info", "inf", "seek", "sk","eject","ejct"};
         CD CD = new CD();
         CD.Init();
         CD.CheckForDisc();
@@ -420,13 +461,31 @@ class Program
                     {
                         CD.Seek(Arg1);
                     }
+                    if (FuncType == "seek")
+                    {
+                        CD.SeekTrack(Arg1);
+                    }
                     if (FuncType == "next")
                     {
-                        CD.Seek(CD.GetTrackPositions()[System.Convert.ToInt16(CD.GetPlayHeadPosition()[1])]);
+                        try
+                        {
+                            CD.Seek(CD.GetTrackPositions()[System.Convert.ToInt16(CD.GetPlayHeadPosition()[1])]);
+                        }
+                        catch
+                        {
+                            ;
+                        }
                     }
                     if (FuncType == "previous")
                     {
-                        CD.Seek(CD.GetTrackPositions()[System.Convert.ToInt16(CD.GetPlayHeadPosition()[1]) - 2]);
+                        try
+                        {
+                            CD.Seek(CD.GetTrackPositions()[System.Convert.ToInt16(CD.GetPlayHeadPosition()[1]) - 2]);
+                        }
+                        catch
+                        {
+                            ;
+                        }
                     }
                     if (FuncType == "ff")
                     {
@@ -438,12 +497,16 @@ class Program
                     }
                     if (FuncType == "plyhdprp")
                     {
-                        CD.ListPlayheadProp();
+                        CD.ListPlayHeadProp();
+                    }
+                    if (FuncType == "open")
+                    {
+                        CD.Tray("open");
                     }
                     if (FuncType == "quit")
                     {
                         CD.End();
-                        Environment.Exit(1);
+                        return;
                     }
                 }
             }
