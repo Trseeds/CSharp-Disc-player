@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using TagLib.Matroska;
 class CD
 {
     string PauseFrom = "00:00:00";
