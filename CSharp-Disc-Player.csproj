@@ -1,12 +1,40 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <RootNamespace>CSharp_Disc_Player</RootNamespace>
-    <!--<ImplicitUsings>enable</ImplicitUsings>-->
-    <Nullable>enable</Nullable>
-    <Platforms>AnyCPU;x86</Platforms>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>netcoreapp3.1</TargetFramework>
+		<RootNamespace>Program</RootNamespace>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Platforms>AnyCPU;x86</Platforms>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+	  <DebugType>none</DebugType>
+	  <WarningLevel>3</WarningLevel>
+	  <NoWarn>1701;1702;8625;</NoWarn>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+	  <DebugType>none</DebugType>
+	  <WarningLevel>3</WarningLevel>
+	  <NoWarn>1701;1702;8625;</NoWarn>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+	  <DebugType>none</DebugType>
+	  <WarningLevel>3</WarningLevel>
+	  <NoWarn>1701;1702;8625;</NoWarn>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+	  <DebugType>none</DebugType>
+	  <WarningLevel>3</WarningLevel>
+	  <NoWarn>1701;1702;8625;</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Content Include="csdp.ico" />
+	</ItemGroup>
 
 </Project>
